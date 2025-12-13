@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shimmer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #222;
+            cursor: pointer; /* Indicates clickable */
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Tiny unlabeled checkbox in bottom right */
+        #rarePauseToggle {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 15px;
+            height: 15px;
+            opacity: 0.4; 
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        #rarePauseToggle:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- The Toggle: Checked = Rare pauses enabled. Unchecked = Constant speed. -->
+    <input type="checkbox" id="rarePauseToggle" checked title="Toggle rare pauses">
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const toggleCheckbox = document.getElementById('rarePauseToggle');
+
+        const allPairs = [
+            // Primary/Secondary Opposites
+            { name: "Green/Magenta", colors: ['#00FF00', '#FF00FF'] },
+            { name: "Yellow/Blue",   colors: ['#FFFF00', '#0000FF'] },
+            { name: "Red/Cyan",      colors: ['#FF0000', '#00FFFF'] },
+            { name: "Orange/Azure",  colors: ['#FF8000', '#007FFF'] },
+            { name: "Lime/Violet",   colors: ['#80FF00', '#7F00FF'] },
+            { name: "Teal/Salmon",   colors: ['#008080', '#FF7F7F'] }
+        ];
+
+        let width, height;
+        let autoTimer = null;
+        let isUserPaused = false; 
+
+        // --- TIMING CONFIGURATION ---
+        const minFastDelay = 10;   // Minimum milliseconds
+        const maxFastDelay = 90;   // Maximum milliseconds
+        const rarePauseChance = 0.0005; // ~1 in 2000 frames
+        // ----------------------------
+
+        function shuffle(array) {
+            let currentIndex = array.length, randomIndex;
+            while (currentIndex != 0) {
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+            return array;
+        }
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        function getBalancedColorDeck(activePairs, totalShapes) {
+            let colorPalette = [];
+            activePairs.forEach(pair => {
+                colorPalette.push(pair.colors[0]);
+                colorPalette.push(pair.colors[1]);
+            });
+
+            const numColors = colorPalette.length;
+            const baseCount = Math.floor(totalShapes / numColors);
+            const remainder = totalShapes % numColors;
+
+            let deck = [];
+            for (let c = 0; c < numColors; c++) {
+                for (let i = 0; i < baseCount; i++) deck.push(colorPalette[c]);
+            }
+            for (let i = 0; i < remainder; i++) deck.push(colorPalette[i]);
+
+            return shuffle(deck);
+        }
+
+        function drawSquares(activePairs, tileSize) {
+            const cols = Math.ceil(width / tileSize);
+            const rows = Math.ceil(height / tileSize);
+            const totalShapes = cols * rows;
+            const colorDeck = getBalancedColorDeck(activePairs, totalShapes);
+            let i = 0;
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    ctx.fillStyle = colorDeck[i++];
+                    ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+                }
+            }
+        }
+
+        function drawTriangles(activePairs, tileSize) {
+            const cols = Math.ceil(width / tileSize);
+            const rows = Math.ceil(height / tileSize);
+            const totalShapes = cols * rows * 2;
+            const colorDeck = getBalancedColorDeck(activePairs, totalShapes);
+            let i = 0;
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const posX = x * tileSize;
+                    const posY = y * tileSize;
+                    // T1
+                    ctx.fillStyle = colorDeck[i++];
+                    ctx.beginPath();
+                    ctx.moveTo(posX, posY);
+                    ctx.lineTo(posX + tileSize, posY);
+                    ctx.lineTo(posX, posY + tileSize);
+                    ctx.fill();
+                    // T2
+                    ctx.fillStyle = colorDeck[i++];
+                    ctx.beginPath();
+                    ctx.moveTo(posX + tileSize, posY);
+                    ctx.lineTo(posX + tileSize, posY + tileSize);
+                    ctx.lineTo(posX, posY + tileSize);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function drawHexagons(activePairs, radius) {
+            const a = 2 * Math.PI / 6;
+            const r = radius;
+            const colDist = 1.5 * r;
+            const rowDist = Math.sqrt(3) * r;
+            const cols = Math.ceil(width / colDist) + 2;
+            const rows = Math.ceil(height / rowDist) + 2;
+            const totalShapes = cols * rows;
+            const colorDeck = getBalancedColorDeck(activePairs, totalShapes);
+            let i = 0;
+            for (let y = -1; y < rows; y++) {
+                for (let x = -1; x < cols; x++) {
+                    let cx = x * colDist;
+                    let cy = y * rowDist;
+                    if (x % 2 !== 0) cy += rowDist / 2;
+                    if (i >= colorDeck.length) i = 0; 
+                    ctx.fillStyle = colorDeck[i++];
+                    ctx.beginPath();
+                    for (let j = 0; j < 6; j++) {
+                        ctx.lineTo(cx + r * Math.cos(a * j), cy + r * Math.sin(a * j));
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = ctx.fillStyle;
+                    ctx.lineWidth = 1;
+                    ctx.stroke(); 
+                }
+            }
+        }
+
+        function generateTesselation() {
+            if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
+                resize();
+            } else {
+                ctx.clearRect(0, 0, width, height);
+            }
+
+            // Determine how many pairs to use (1 up to ALL pairs)
+            const numPairsToUse = Math.floor(Math.random() * allPairs.length) + 1; 
+            
+            let shuffledPairs = shuffle([...allPairs]);
+            const selectedPairs = shuffledPairs.slice(0, numPairsToUse);
+            const shapes = ['squares', 'triangles', 'hexagons'];
+            const selectedShape = shapes[Math.floor(Math.random() * shapes.length)];
+            const size = Math.floor(Math.random() * 40) + 40; 
+
+            if (selectedShape === 'squares') drawSquares(selectedPairs, size);
+            else if (selectedShape === 'triangles') drawTriangles(selectedPairs, size);
+            else if (selectedShape === 'hexagons') drawHexagons(selectedPairs, size / 1.5);
+        }
+
+        function scheduleNextAuto() {
+            if (isUserPaused) return;
+            if (autoTimer) clearTimeout(autoTimer);
+
+            let delay;
+            const allowRarePauses = toggleCheckbox.checked;
+
+            if (allowRarePauses && Math.random() < rarePauseChance) {
+                delay = 1000; 
+            } else {
+                delay = Math.floor(minFastDelay + Math.random() * (maxFastDelay - minFastDelay));
+            }
+
+            autoTimer = setTimeout(() => {
+                generateTesselation();
+                scheduleNextAuto();
+            }, delay);
+        }
+
+        // --- PAUSE / RESUME LOGIC ---
+
+        function userPause() {
+            if (isUserPaused) return;
+            isUserPaused = true;
+            if (autoTimer) clearTimeout(autoTimer);
+        }
+
+        function userResume() {
+            if (!isUserPaused) return;
+            isUserPaused = false;
+            generateTesselation(); 
+            scheduleNextAuto();
+        }
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target === toggleCheckbox) return;
+            userPause();
+        });
+        window.addEventListener('mouseup', userResume);
+        window.addEventListener('mouseleave', userResume);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); 
+                userPause();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); 
+                userResume();
+            }
+        });
+
+        // Initialize
+        resize();
+        generateTesselation();
+        scheduleNextAuto();
+
+    </script>
+</body>
+</html>
