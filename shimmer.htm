@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shimmer</title>
+    <style>
+        body,html{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#222;cursor:pointer}
+        canvas{display:block}
+        #rarePauseToggle{position:absolute;bottom:10px;right:10px;width:15px;height:15px;opacity:.4;cursor:pointer;z-index:100}
+        #rarePauseToggle:hover{opacity:1}
+        #dimSlider{position:absolute;bottom:10px;left:10px;width:120px;height:20px;z-index:100;cursor:pointer;-webkit-appearance:none;background:rgba(255,255,255,.3);border-radius:10px}
+        #dimSlider::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;background:#fff;border-radius:50%}
+        #dimSlider::-moz-range-thumb{width:24px;height:24px;background:#fff;border-radius:50%;border:none}
+        #dimOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:.5;pointer-events:none;z-index:9999}
+    </style>
+</head>
+<body>
+    <input type="checkbox" id="rarePauseToggle" checked>
+    <input type="range" id="dimSlider" min="0" max="99" value="50">
+    <div id="dimOverlay"></div>
+    <canvas id="canvas"></canvas>
+    <script>
+        const ctx = canvas.getContext('2d');
+        const palette = ['#000','#FFF','#0F0','#F0F','#FF0','#00F','#F00','#0FF','#F80','#07F','#8F0','#70F','#088','#F77'];
+        const numColors = 14;
+        const tileSize = 30;
+        const h = 15;
+        const c45 = .7071067811865476;
+        const s45 = .7071067811865476;
+        const triOff = [-h,-h,0,-h,0,-h,h,-h,h,-h,h,0,h,0,h,h,h,h,0,h,0,h,-h,h,-h,h,-h,0,-h,0,-h,-h];
+        const rOff = new Float32Array(32);
+        for(let k=0;k<8;k++){const o=k<<2;rOff[o]=triOff[o]*c45-triOff[o+1]*s45;rOff[o+1]=triOff[o]*s45+triOff[o+1]*c45;rOff[o+2]=triOff[o+2]*c45-triOff[o+3]*s45;rOff[o+3]=triOff[o+2]*s45+triOff[o+3]*c45}
+        
+        let w,ht,timer=null,paused=false,deck,bufs=new Array(numColors),counts=new Uint32Array(numColors);
+        for(let i=0;i<numColors;i++)bufs[i]=new Float32Array(600000);
+        
+        dimSlider.oninput=()=>dimOverlay.style.opacity=dimSlider.value/100;
+        
+        function draw(){
+            w=canvas.width=innerWidth;ht=canvas.height=innerHeight;
+            const d=Math.sqrt(w*w+ht*ht),r=((d/tileSize)>>1)+2,sz=r<<1,tot=sz*sz<<3;
+            if(!deck||deck.length!==tot)deck=new Uint8Array(tot);
+            const bc=(tot/numColors)|0,rm=tot%numColors;
+            let idx=0;
+            for(let c=0;c<numColors;c++){const cnt=bc+(c<rm?1:0);for(let i=0;i<cnt;i++)deck[idx++]=c}
+            for(let i=tot-1;i>0;i--){const j=(Math.random()*(i+1))|0,t=deck[i];deck[i]=deck[j];deck[j]=t}
+            counts.fill(0);
+            const cx=w>>1,cy=ht>>1;
+            let di=0;
+            for(let y=-r;y<r;y++){
+                const ty=(y+.5)*tileSize,tyc=ty*c45,tys=ty*s45;
+                for(let x=-r;x<r;x++){
+                    const tx=(x+.5)*tileSize,rcx=tx*c45-tys+cx,rcy=tx*s45+tyc+cy;
+                    for(let k=0;k<8;k++){
+                        const ci=deck[di++],b=bufs[ci],p=counts[ci],o=k<<2;
+                        b[p]=rcx;b[p+1]=rcy;b[p+2]=rcx+rOff[o];b[p+3]=rcy+rOff[o+1];b[p+4]=rcx+rOff[o+2];b[p+5]=rcy+rOff[o+3];
+                        counts[ci]=p+6;
+                    }
+                }
+            }
+            for(let c=0;c<numColors;c++){
+                const len=counts[c];if(!len)continue;
+                const b=bufs[c];ctx.fillStyle=palette[c];ctx.beginPath();
+                for(let i=0;i<len;i+=6){ctx.moveTo(b[i],b[i+1]);ctx.lineTo(b[i+2],b[i+3]);ctx.lineTo(b[i+4],b[i+5])}
+                ctx.fill();
+            }
+        }
+        
+        function schedule(){
+            if(paused)return;
+            timer=setTimeout(()=>{draw();schedule()},rarePauseToggle.checked&&Math.random()<.001?1000:(5+Math.random()*20)|0);
+        }
+        
+        function pause(){if(paused)return;paused=true;clearTimeout(timer)}
+        function resume(){if(!paused)return;paused=false;draw();schedule()}
+        
+        onmousedown=e=>{if(e.target!==rarePauseToggle&&e.target!==dimSlider)pause()};
+        onmouseup=resume;
+        onmouseleave=resume;
+        onkeydown=e=>{if(e.code==='Space'){e.preventDefault();pause()}};
+        onkeyup=e=>{if(e.code==='Space'){e.preventDefault();resume()}};
+        
+        draw();schedule();
+    </script>
+</body>
+</html>
