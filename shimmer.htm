@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>Shimmer</title>
+ <style>
+  body,html{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#111;cursor:crosshair;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;touch-action:none}
+  canvas{display:block}
+  #brushCanvas{position:fixed;top:0;left:0;z-index:10000;pointer-events:none;display:none}
+  .controls{position:absolute;z-index:100001;display:flex;flex-direction:column;gap:2px;width:160px;padding:8px;background:rgba(0,0,0,0.6);border-radius:6px;border:1px solid rgba(255,255,255,0.15);opacity:0.7;transition:opacity 0.3s ease,background 0.3s ease;color:rgba(255,255,255,0.9);pointer-events:all;user-select:none}
+  .controls:hover{opacity:1;background:rgba(0,0,0,0.85)}
+  .controls-left{bottom:10px;left:10px}
+  .controls-right{bottom:10px;right:10px}
+  .control-row{display:flex;flex-direction:column;margin-bottom:2px}
+  .label-line{display:flex;justify-content:space-between;align-items:baseline;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.6)}
+  .val-display{font-family:monospace;color:#fff;font-size:10px}
+  input[type=range]{width:100%;cursor:pointer;-webkit-appearance:none;background:rgba(255,255,255,0.2);border-radius:2px;height:3px;outline:none;margin:4px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:#ddd;border-radius:50%;border:1px solid rgba(0,0,0,0.5);transition:background .2s,transform .2s;box-shadow:0 1px 2px rgba(0,0,0,0.3)}
+  input[type=range]::-webkit-slider-thumb:hover{background:#fff;transform:scale(1.1)}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;background:#ddd;border:none;border-radius:50%}
+  input[type=range]::-moz-range-track{background:rgba(255,255,255,0.2);border-radius:2px;height:3px}
+  .btn-row{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+  .btn{flex:1;min-width:calc(50% - 2px);padding:4px 6px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;color:rgba(255,255,255,0.8);cursor:pointer;transition:all .2s}
+  .btn:hover{background:rgba(255,255,255,0.2);color:#fff}
+  .btn:active{transform:scale(0.96)}
+  .btn.active{background:rgba(255,255,255,0.25);border-color:rgba(255,255,255,0.5)}
+  .palette-container{display:flex;gap:3px;margin-top:4px}
+  .tool-column{display:flex;flex-direction:column;gap:2px}
+  .color-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;flex:1}
+  .palette-swatch{width:14px;height:14px;border-radius:2px;cursor:pointer;border:2px solid transparent;transition:all .2s;box-shadow:0 1px 2px rgba(0,0,0,0.3)}
+  .palette-swatch:hover{transform:scale(1.15);z-index:1}
+  .palette-swatch.active{border-color:#fff;transform:scale(1.1)}
+  .palette-swatch.special-tool{display:flex;align-items:center;justify-content:center;font-size:9px;background:rgba(255,255,255,0.15);line-height:1}
+  .top-row{display:flex;gap:6px;align-items:center}
+  .stats{font-size:14px;color:#fff;font-family:monospace;font-weight:bold;text-shadow:0 0 12px rgba(0,200,255,0.9),0 0 24px rgba(0,200,255,0.5);padding:6px 8px;background:linear-gradient(135deg,rgba(0,80,120,0.5),rgba(0,40,80,0.5));border-radius:6px;letter-spacing:0.5px;border:1px solid rgba(0,200,255,0.3);white-space:nowrap}
+  .settings-toggle{font-size:16px;cursor:pointer;padding:4px;border-radius:4px;transition:all .2s;opacity:0.6}
+  .settings-toggle:hover{opacity:1;background:rgba(255,255,255,0.1)}
+  .settings-toggle.active{opacity:1;background:rgba(255,255,255,0.15)}
+  .advanced-panel{display:none;margin-top:6px;padding:6px;background:rgba(40,60,80,0.5);border-radius:4px;border:1px solid rgba(0,200,255,0.2)}
+  .advanced-panel.visible{display:block}
+  .brush-panel{display:none;margin-top:6px;padding:6px;background:rgba(80,60,40,0.5);border-radius:4px;border:1px solid rgba(255,180,100,0.3)}
+  .brush-panel.visible{display:block}
+  .chipaway-panel{display:none;margin-top:6px;padding:6px;background:rgba(60,80,60,0.5);border-radius:4px;border:1px solid rgba(100,200,100,0.3)}
+  .chipaway-panel.visible{display:block}
+  .mini-controls{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+  .mini-control{display:flex;flex-direction:column;align-items:center;gap:1px}
+  .mini-label{font-size:7px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.3px;text-align:center;line-height:1}
+  .mini-input{width:36px;height:18px;padding:1px 3px;font-size:10px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:2px;color:#fff;text-align:center;font-family:monospace;cursor:ns-resize}
+  .mini-input:focus{outline:none;border-color:rgba(0,200,255,0.5);background:rgba(255,255,255,0.15)}
+  .mini-input.dragging{border-color:rgba(255,200,100,0.8);background:rgba(255,200,100,0.2)}
+  .color-picker-wrap{position:relative}
+  .color-picker-btn{width:36px;height:18px;border-radius:2px;cursor:pointer;border:1px solid rgba(255,255,255,0.3)}
+  .color-picker-btn:hover{border-color:rgba(255,255,255,0.6)}
+  .color-picker-hidden{position:absolute;opacity:0;width:36px;height:18px;cursor:pointer}
+  .cell-count{font-size:9px;color:rgba(255,255,255,0.5);margin-top:6px;font-family:monospace;text-align:center;letter-spacing:0.5px}
+  .help-text{font-size:8px;color:rgba(255,255,255,0.4);margin-top:4px;line-height:1.3}
+  #dimOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:0.5;pointer-events:none;z-index:9999}
+  .mode-indicator{position:absolute;top:12px;left:50%;transform:translateX(-50%);padding:6px 10px;background:rgba(0,0,0,0.7);border-radius:4px;font-size:18px;opacity:0;transition:opacity .3s;pointer-events:none;display:flex;align-items:center;justify-content:center;z-index:100002}
+  .mode-indicator.visible{opacity:1}
+  .mode-indicator .color-swatch{width:24px;height:24px;border-radius:4px;border:2px solid rgba(255,255,255,0.3);box-shadow:0 2px 8px rgba(0,0,0,0.4)}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;margin:6px 0;padding:4px 0}
+  .toggle-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.6)}
+  .toggle-switch{position:relative;width:44px;height:22px;background:rgba(255,255,255,0.15);border-radius:11px;cursor:pointer;transition:background 0.3s;border:1px solid rgba(255,255,255,0.2)}
+  .toggle-switch.active{background:rgba(80,180,120,0.6);border-color:rgba(80,180,120,0.8)}
+  .toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#aaa;border-radius:50%;transition:transform 0.3s ease,background 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.4)}
+  .toggle-switch:hover::after{background:#ccc}
+  .toggle-switch.active::after{transform:translateX(22px);background:#fff}
+  .tool-toggle{font-size:16px;cursor:pointer;padding:4px;border-radius:4px;transition:all .2s;opacity:0.6}
+  .tool-toggle:hover{opacity:1;background:rgba(255,255,255,0.1)}
+  .tool-toggle.active{opacity:1;background:rgba(255,180,100,0.3)}
+  .tool-toggle.chipaway-toggle.active{background:rgba(100,200,100,0.3)}
+  .small-btn{font-size:8px;padding:3px 6px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;color:rgba(255,255,255,0.8);cursor:pointer}
+  .small-btn:hover{background:rgba(255,255,255,0.2)}
+  .small-btn.danger{background:rgba(255,100,100,0.2);border-color:rgba(255,100,100,0.4)}
+  .small-btn.danger:hover{background:rgba(255,100,100,0.4)}
+  .brush-btn-row{display:flex;gap:3px;margin-top:4px}
+  .brush-btn-row .small-btn{flex:1;text-align:center}
+  .io-section{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.1)}
+  .io-btn-row{display:flex;gap:4px}
+  .io-btn-row .small-btn{flex:1;text-align:center}
+  #fileInput{display:none}
+  .tool-row{display:flex;gap:4px;align-items:center}
+ </style>
+</head>
+<body>
+ <div class="mode-indicator" id="modeIndicator"></div>
+ <div class="controls controls-left">
+  <div class="top-row">
+   <div class="stats" id="stats">FPS: --</div>
+   <div class="settings-toggle" id="settingsToggle" title="Advanced Options">🎛️</div>
+  </div>
+  <div class="advanced-panel" id="advancedPanel">
+   <div class="mini-controls">
+    <div class="mini-control"><span class="mini-label">Tile Size</span><input type="text" class="mini-input" id="tileSizeInput" value="28" data-min="8" data-max="100" data-step="1"></div>
+    <div class="mini-control"><span class="mini-label">BG Color</span><div class="color-picker-wrap"><input type="color" class="color-picker-hidden" id="bgColorPicker" value="#808080"><div class="color-picker-btn" id="bgColorBtn" style="background:#808080"></div></div></div>
+    <div class="mini-control"><span class="mini-label">Evolve α</span><input type="text" class="mini-input" id="evolveAlpha" value="100" data-min="0" data-max="100" data-step="1"></div>
+    <div class="mini-control"><span class="mini-label">Locked α</span><input type="text" class="mini-input" id="lockAlpha" value="100" data-min="0" data-max="100" data-step="1"></div>
+   </div>
+   <div class="io-section">
+    <div class="io-btn-row">
+     <button class="small-btn" id="exportBtn">📤 Export</button>
+     <button class="small-btn" id="importBtn">📥 Load</button>
+    </div>
+    <input type="file" id="fileInput" accept=".json">
+   </div>
+  </div>
+  <div class="toggle-row"><span class="toggle-label">Still</span><div class="toggle-switch" id="toggleStill"></div></div>
+  <div class="control-row"><div class="label-line"><span>Mutation</span><span id="vMut" class="val-display">18%</span></div><input type="range" id="mutationSlider" min="0" max="100" value="18"></div>
+  <div class="control-row"><div class="label-line"><span>Darkness</span><span id="vDim" class="val-display">50%</span></div><input type="range" id="dimSlider" min="0" max="99" value="50"></div>
+  <div class="control-row"><div class="label-line"><span>Drift</span><span id="vDrift" class="val-display">20%</span></div><input type="range" id="driftSlider" min="0" max="100" value="20"></div>
+  <div class="control-row"><div class="label-line"><span>Color Rate</span><span id="vColor" class="val-display">94</span></div><input type="range" id="colorRateSlider" min="1" max="100" value="94"></div>
+  <div class="control-row"><div class="label-line"><span>Distortion</span><span id="vDist" class="val-display">35%</span></div><input type="range" id="distortSlider" min="0" max="300" value="35"></div>
+ </div>
+ <div class="controls controls-right">
+  <div class="tool-row">
+   <div class="tool-toggle" id="brushToggle" title="Overlay Brush">🪶</div>
+   <div class="tool-toggle chipaway-toggle" id="chipawayToggle" title="Chip Away">🧊</div>
+  </div>
+  <div class="brush-panel" id="brushPanel">
+   <div class="mini-controls">
+    <div class="mini-control"><span class="mini-label">Size</span><input type="text" class="mini-input" id="overlayBrushSize" value="2" data-min="1" data-max="100" data-step="1"></div>
+    <div class="mini-control"><span class="mini-label">Color</span><div class="color-picker-wrap"><input type="color" class="color-picker-hidden" id="overlayBrushColor" value="#808080"><div class="color-picker-btn" id="overlayBrushColorBtn" style="background:#808080"></div></div></div>
+    <div class="mini-control"><span class="mini-label">Opacity</span><input type="text" class="mini-input" id="overlayBrushOpacity" value="100" data-min="0" data-max="100" data-step="1"></div>
+   </div>
+   <div class="brush-btn-row">
+    <button class="small-btn" id="brushUndoBtn">↶ Undo</button>
+    <button class="small-btn" id="brushRedoBtn">↷ Redo</button>
+    <button class="small-btn danger" id="clearBrushBtn">Clear</button>
+   </div>
+  </div>
+  <div class="chipaway-panel" id="chipawayPanel">
+   <div class="mini-controls">
+    <div class="mini-control"><span class="mini-label">Rate %</span><input type="text" class="mini-input" id="chipawayRate" value="0.3" data-min="0.01" data-max="10" data-step="0.1" data-decimals="2"></div>
+   </div>
+  </div>
+  <div class="control-row"><div class="label-line"><span>Brush</span><span id="vBrush" class="val-display">1</span></div><input type="range" id="brushSlider" min="1" max="10" value="1"></div>
+  <div class="palette-container">
+   <div class="tool-column">
+    <div class="palette-swatch special-tool" id="toolWake" title="Wake/Unfreeze">🌌</div>
+    <div class="palette-swatch special-tool" id="toolRandom" title="Random Color">🎰</div>
+   </div>
+   <div class="color-grid" id="palette"></div>
+  </div>
+  <div class="btn-row">
+   <button class="btn" id="btnReset">Reset</button>
+   <button class="btn" id="btnRandomize">Randomize</button>
+   <button class="btn" id="btnSymmetry">Sym: Off</button>
+   <button class="btn" id="btnSave">Save</button>
+  </div>
+  <div class="help-text">Click+drag: paint • Right-click: erase<br>Space: pause • Ctrl+S: save • R: reset</div>
+  <div class="cell-count" id="cellCount">-- cells</div>
+ </div>
+ <div id="dimOverlay"></div>
+ <canvas id="canvas"></canvas>
+ <canvas id="brushCanvas"></canvas>
+ <script>
+ (function(){
+  const PALETTE=['#000000','#FFFFFF','#00FF00','#FF00FF','#FFFF00','#0000FF','#FF0000','#00FFFF','#FF8000','#007FFF','#80FF00','#7F00FF','#008080','#FF7F7F'];
+  const NUM_COLORS=PALETTE.length, COS45=0.70710678, BATCH_LIMIT=1800;
+  const TOOL_WAKE=-2, TOOL_RANDOM=-3;
+  const DX=[0,-1,-1,-1,0,1,1,1], DY=[-1,-1,0,1,1,1,0,-1];
+  const ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
+  const brushCanvas=document.getElementById('brushCanvas');
+  const brushCtx=brushCanvas.getContext('2d');
+  const de2000=new Float32Array(NUM_COLORS*NUM_COLORS);
+  const bufsEvolve=Array.from({length:NUM_COLORS},()=>new Float32Array(1500000));
+  const bufsLocked=Array.from({length:NUM_COLORS},()=>new Float32Array(1500000));
+  const bufs=Array.from({length:NUM_COLORS},()=>new Float32Array(1500000));
+  const countsEvolve=new Uint32Array(NUM_COLORS);
+  const countsLocked=new Uint32Array(NUM_COLORS);
+  const counts=new Uint32Array(NUM_COLORS);
+
+  const DEFAULT_TILE=28;
+  let TILE=DEFAULT_TILE;
+  let w,ht,radius,gridW,gridH,totalCells,cx,cy;
+  let gridA,gridB,activeGrid,nextGrid,neighborLUT,cellNodes;
+  let nodePositions,nodeTargets,nodeCount,lockedCells,wokenCells,activeNodes;
+  let mutationRate=0.18, driftSpeed=0.2, colorInterval=80, jitterScale=0.35;
+  let paused=false, stillMode=false, lastColorTime=0, resizeTimeout;
+  let isDrawing=false, isErasing=false, isWaking=false, isRandomPaint=false, drawColor=0, lastX=0, lastY=0;
+  let brushSize=1, symmetryMode=0, selectedPaletteColor=-1;
+  let frameCount=0, lastFpsTime=0, currentFps=0;
+  let history=[], historyIndex=-1, maxHistory=50;
+  let advancedMode=false, evolveAlpha=1, lockAlpha=1, bgColor='#808080';
+  
+  let overlayBrushMode=false, overlayBrushSize=2, overlayBrushColor='#808080', overlayBrushOpacity=1;
+  let isOverlayDrawing=false, overlayLastX=0, overlayLastY=0;
+  let savedBrushData=null;
+  let brushHistory=[], brushHistoryIndex=-1, maxBrushHistory=30;
+
+  let chipawayMode=false, chipawayRate=0.003;
+
+  let dragInput=null, dragStartY=0, dragStartValue=0;
+
+  function getDarkness(){
+   return parseFloat(dimOverlay.style.opacity)||0.5;
+  }
+
+  function darkenHex(hex){
+   const d=getDarkness();
+   const v=parseInt(hex.slice(1),16);
+   const r=Math.round(((v>>16)&255)*(1-d));
+   const g=Math.round(((v>>8)&255)*(1-d));
+   const b=Math.round((v&255)*(1-d));
+   return `rgb(${r},${g},${b})`;
+  }
+
+  function updateFps(t){
+   frameCount++;
+   if(t-lastFpsTime>=1000){
+    currentFps=frameCount;
+    frameCount=0;
+    lastFpsTime=t;
+    el('stats').textContent=`FPS: ${currentFps}`;
+   }
+  }
+
+  function updateCellCount(){
+   el('cellCount').textContent=`${totalCells.toLocaleString()} cells`;
+  }
+
+  function saveHistory(){
+   if(historyIndex<history.length-1) history=history.slice(0,historyIndex+1);
+   history.push({grid:activeGrid.slice(),locked:lockedCells.slice()});
+   if(history.length>maxHistory) history.shift();
+   historyIndex=history.length-1;
+  }
+
+  function undo(){
+   if(historyIndex>0){
+    historyIndex--;
+    activeGrid.set(history[historyIndex].grid);
+    lockedCells.set(history[historyIndex].locked);
+    render();
+   }
+  }
+
+  function redo(){
+   if(historyIndex<history.length-1){
+    historyIndex++;
+    activeGrid.set(history[historyIndex].grid);
+    lockedCells.set(history[historyIndex].locked);
+    render();
+   }
+  }
+
+  function saveBrushHistory(){
+   if(brushHistoryIndex<brushHistory.length-1) brushHistory=brushHistory.slice(0,brushHistoryIndex+1);
+   brushHistory.push(brushCtx.getImageData(0,0,w,ht));
+   if(brushHistory.length>maxBrushHistory) brushHistory.shift();
+   brushHistoryIndex=brushHistory.length-1;
+  }
+
+  function undoBrush(){
+   if(brushHistoryIndex>0){
+    brushHistoryIndex--;
+    brushCtx.putImageData(brushHistory[brushHistoryIndex],0,0);
+   }
+  }
+
+  function redoBrush(){
+   if(brushHistoryIndex<brushHistory.length-1){
+    brushHistoryIndex++;
+    brushCtx.putImageData(brushHistory[brushHistoryIndex],0,0);
+   }
+  }
+
+  (function(){
+   const toLab=h=>{
+    let v=parseInt(h.slice(1),16),r=((v>>16)&255)/255,g=((v>>8)&255)/255,b=(v&255)/255;
+    r=r>.04045?Math.pow((r+.055)/1.055,2.4):r/12.92;
+    g=g>.04045?Math.pow((g+.055)/1.055,2.4):g/12.92;
+    b=b>.04045?Math.pow((b+.055)/1.055,2.4):b/12.92;
+    let x=(r*.4124+g*.3576+b*.1805)/.9505, y=r*.2126+g*.7152+b*.0722, z=(r*.0193+g*.1192+b*.9503)/1.0888;
+    x=x>.008856?Math.pow(x,1/3):7.787*x+16/116;
+    y=y>.008856?Math.pow(y,1/3):7.787*y+16/116;
+    z=z>.008856?Math.pow(z,1/3):7.787*z+16/116;
+    return[116*y-16,500*(x-y),200*(y-z)];
+   };
+   const dE=(a,b)=>{
+    let L1=a[0],a1=a[1],b1=a[2],L2=b[0],a2=b[1],b2=b[2];
+    let C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), Cb=(C1+C2)/2;
+    let G=.5*(1-Math.sqrt(Math.pow(Cb,7)/(Math.pow(Cb,7)+6103515625)));
+    let a1p=(1+G)*a1, a2p=(1+G)*a2, C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2);
+    let h1p=Math.atan2(b1,a1p)*180/Math.PI, h2p=Math.atan2(b2,a2p)*180/Math.PI;
+    if(h1p<0)h1p+=360; if(h2p<0)h2p+=360;
+    let dhp=h2p-h1p; if(C1p*C2p){if(dhp>180)dhp-=360;else if(dhp<-180)dhp+=360;}else dhp=0;
+    let dHp=2*Math.sqrt(C1p*C2p)*Math.sin(dhp*Math.PI/360), Lbp=(L1+L2)/2, Cbp=(C1p+C2p)/2;
+    let hbp=h1p+h2p; if(C1p*C2p){hbp/=2;if(Math.abs(h1p-h2p)>180)hbp+=hbp<180?180:-180;}
+    let T=1-.17*Math.cos((hbp-30)*Math.PI/180)+.24*Math.cos(2*hbp*Math.PI/180)+.32*Math.cos((3*hbp+6)*Math.PI/180)-.2*Math.cos((4*hbp-63)*Math.PI/180);
+    let Sl=1+.015*Math.pow(Lbp-50,2)/Math.sqrt(20+Math.pow(Lbp-50,2)), Sc=1+.045*Cbp, Sh=1+.015*Cbp*T;
+    let Rt=-Math.sin(2*30*Math.exp(-Math.pow((hbp-275)/25,2))*Math.PI/180)*2*Math.sqrt(Math.pow(Cbp,7)/(Math.pow(Cbp,7)+6103515625));
+    let dL=(L2-L1)/Sl, dC=(C2p-C1p)/Sc, dH=dHp/Sh;
+    return Math.sqrt(dL*dL+dC*dC+dH*dH+Rt*dC*dH);
+   };
+   const labs=PALETTE.map(toLab);
+   for(let i=0;i<NUM_COLORS;i++) for(let j=0;j<NUM_COLORS;j++) de2000[i*NUM_COLORS+j]=dE(labs[i],labs[j]);
+  })();
+
+  function initGrid(keepBrush=false){
+   const oldW=w, oldH=ht;
+   const oldBrushData=keepBrush&&w&&ht?brushCtx.getImageData(0,0,w,ht):null;
+   w=canvas.width=brushCanvas.width=innerWidth; ht=canvas.height=brushCanvas.height=innerHeight; cx=w>>1; cy=ht>>1;
+   radius=((Math.sqrt(w*w+ht*ht)/TILE)>>1)+2; gridW=gridH=radius<<1; totalCells=gridW*gridH*8;
+   gridA=new Uint8Array(totalCells); gridB=new Uint8Array(totalCells);
+   activeGrid=gridA; nextGrid=gridB;
+   neighborLUT=new Int32Array(totalCells*3);
+   lockedCells=new Uint8Array(totalCells); wokenCells=new Uint8Array(totalCells);
+   const cC=(gridW+1)*(gridH+1), hM=gridW*(gridH+1), vM=(gridW+1)*gridH;
+   nodeCount=cC+hM+vM+gridW*gridH;
+   nodePositions=new Float32Array(nodeCount*2); nodeTargets=new Float32Array(nodeCount*2);
+   activeNodes=new Uint8Array(nodeCount);
+   const jit=TILE*jitterScale; let idx=0;
+   const setNode=(bx,by,isCenter)=>{
+    const i2=idx<<1, rx=bx*COS45-by*COS45+cx, ry=bx*COS45+by*COS45+cy;
+    if(isCenter){ nodePositions[i2]=nodeTargets[i2]=rx; nodePositions[i2|1]=nodeTargets[i2|1]=ry; }
+    else{
+     nodePositions[i2]=rx+(Math.random()-.5)*jit; nodePositions[i2|1]=ry+(Math.random()-.5)*jit;
+     nodeTargets[i2]=rx+(Math.random()-.5)*jit; nodeTargets[i2|1]=ry+(Math.random()-.5)*jit;
+    } idx++;
+   };
+   for(let ty=0;ty<=gridH;ty++) for(let tx=0;tx<=gridW;tx++) setNode((tx-radius)*TILE,(ty-radius)*TILE);
+   for(let ty=0;ty<=gridH;ty++) for(let tx=0;tx<gridW;tx++) setNode((tx-radius+.5)*TILE,(ty-radius)*TILE);
+   for(let ty=0;ty<gridH;ty++) for(let tx=0;tx<=gridW;tx++) setNode((tx-radius)*TILE,(ty-radius+.5)*TILE);
+   for(let ty=0;ty<gridH;ty++) for(let tx=0;tx<gridW;tx++) setNode((tx-radius+.5)*TILE,(ty-radius+.5)*TILE,true);
+   cellNodes=new Int32Array(totalCells*3);
+   for(let ty=0;ty<gridH;ty++) for(let tx=0;tx<gridW;tx++){
+    const base=(ty*gridW+tx)*8, center=cC+hM+vM+ty*gridW+tx;
+    const sur=[cC+ty*gridW+tx,ty*(gridW+1)+tx+1,cC+hM+ty*(gridW+1)+tx+1,(ty+1)*(gridW+1)+tx+1,cC+(ty+1)*gridW+tx,(ty+1)*(gridW+1)+tx,cC+hM+ty*(gridW+1)+tx,ty*(gridW+1)+tx];
+    for(let tri=0;tri<8;tri++){
+     const i=base+tri, nB=i*3, ntx=tx+DX[tri], nty=ty+DY[tri];
+     activeGrid[i]=(Math.random()*NUM_COLORS)|0;
+     neighborLUT[nB]=base+((tri+1)&7); neighborLUT[nB+1]=base+((tri+7)&7);
+     neighborLUT[nB+2]=(ntx>=0&&ntx<gridW&&nty>=0&&nty<gridH)?(nty*gridW+ntx)*8+((tri+4)&7):-1;
+     cellNodes[nB]=center; cellNodes[nB+1]=sur[(9-tri)&7]; cellNodes[nB+2]=sur[(8-tri)&7];
+    }
+   }
+   if(oldBrushData) brushCtx.putImageData(oldBrushData,0,0);
+   brushHistory=[]; brushHistoryIndex=-1; saveBrushHistory();
+   history=[]; historyIndex=-1; saveHistory();
+   updateCellCount();
+  }
+
+  function driftNodes(){
+   const ease=.005+driftSpeed*.08, prob=.005+driftSpeed*.05, jit=TILE*jitterScale;
+   const b1=(gridW+1)*(gridH+1), b2=b1+gridW*(gridH+1), b3=b2+(gridW+1)*gridH;
+   for(let i=0;i<nodeCount;i++){
+    if(stillMode&&!activeNodes[i])continue;
+    const px=i<<1, py=px|1;
+    nodePositions[px]+=(nodeTargets[px]-nodePositions[px])*ease;
+    nodePositions[py]+=(nodeTargets[py]-nodePositions[py])*ease;
+    if(Math.random()<prob){
+     let bx,by,j=jit;
+     if(i<b1){ bx=((i%(gridW+1))-radius)*TILE; by=(((i/(gridW+1))|0)-radius)*TILE; }
+     else if(i<b2){ const l=i-b1; bx=((l%gridW)-radius+.5)*TILE; by=(((l/gridW)|0)-radius)*TILE; }
+     else if(i<b3){ const l=i-b2; bx=((l%(gridW+1))-radius)*TILE; by=(((l/(gridW+1))|0)-radius+.5)*TILE; }
+     else{ const l=i-b3; bx=((l%gridW)-radius+.5)*TILE; by=(((l/gridW)|0)-radius+.5)*TILE; j=0; }
+     nodeTargets[px]=bx*COS45-by*COS45+cx+(Math.random()-.5)*j;
+     nodeTargets[py]=bx*COS45+by*COS45+cy+(Math.random()-.5)*j;
+    }
+   }
+  }
+
+  function stepColors(){
+   const tmp=activeGrid; activeGrid=nextGrid; nextGrid=tmp;
+   for(let i=0;i<totalCells;i++){
+    if(chipawayMode&&lockedCells[i]){
+     const nB=i*3;
+     const n1=neighborLUT[nB], n2=neighborLUT[nB+1], n3=neighborLUT[nB+2];
+     let liveNeighbor=-1;
+     if(!lockedCells[n1]) liveNeighbor=n1;
+     else if(!lockedCells[n2]) liveNeighbor=n2;
+     else if(n3!==-1&&!lockedCells[n3]) liveNeighbor=n3;
+     if(liveNeighbor!==-1&&Math.random()<chipawayRate){
+      lockedCells[i]=0;
+      wokenCells[i]=1;
+      const nBi=i*3;
+      activeNodes[cellNodes[nBi]]=activeNodes[cellNodes[nBi+1]]=activeNodes[cellNodes[nBi+2]]=1;
+      activeGrid[i]=nextGrid[liveNeighbor];
+      continue;
+     }
+    }
+    if(lockedCells[i]||(stillMode&&!wokenCells[i])){ activeGrid[i]=nextGrid[i]; continue; }
+    const cur=nextGrid[i];
+    if(Math.random()<mutationRate){ let c; do{c=(Math.random()*NUM_COLORS)|0}while(c===cur); activeGrid[i]=c; continue; }
+    const nB=i*3, c1=nextGrid[neighborLUT[nB]], c2=nextGrid[neighborLUT[nB+1]];
+    const n3=neighborLUT[nB+2], c3=n3!==-1?nextGrid[n3]:cur, has3=n3!==-1;
+    let s1=1e9,k1=0, s2=1e9,k2=0, s3=1e9,k3=0;
+    for(let c=0;c<NUM_COLORS;c++){
+     if(c===cur)continue;
+     const row=c*NUM_COLORS; let s=de2000[row+c1]+de2000[row+c2]; if(has3)s+=de2000[row+c3];
+     if(s<s1){ s3=s2;k3=k2; s2=s1;k2=k1; s1=s;k1=c; }
+     else if(s<s2){ s3=s2;k3=k2; s2=s;k2=c; }
+     else if(s<s3){ s3=s;k3=c; }
+    }
+    const r=(Math.random()*3)|0; activeGrid[i]=r===0?k1:r===1?k2:k3;
+   }
+  }
+
+  function renderSimple(){
+   const np=nodePositions, cn=cellNodes, ag=activeGrid; counts.fill(0);
+   for(let i=0;i<totalCells;i++){
+    const c=ag[i], ptr=counts[c], buf=bufs[c], nB=i*3;
+    const n0=cn[nB]<<1, n1=cn[nB+1]<<1, n2=cn[nB+2]<<1;
+    buf[ptr]=(np[n0]+0.5)|0; buf[ptr+1]=(np[n0|1]+0.5)|0;
+    buf[ptr+2]=(np[n1]+0.5)|0; buf[ptr+3]=(np[n1|1]+0.5)|0;
+    buf[ptr+4]=(np[n2]+0.5)|0; buf[ptr+5]=(np[n2|1]+0.5)|0;
+    counts[c]=ptr+6;
+   }
+   ctx.fillStyle='#111'; ctx.fillRect(0,0,w,ht);
+   for(let c=0;c<NUM_COLORS;c++){
+    const cnt=counts[c]; if(!cnt)continue; const buf=bufs[c];
+    ctx.fillStyle=PALETTE[c]; ctx.beginPath(); let inBatch=0;
+    for(let i=0;i<cnt;i+=6){
+     ctx.moveTo(buf[i],buf[i+1]); ctx.lineTo(buf[i+2],buf[i+3]); ctx.lineTo(buf[i+4],buf[i+5]);
+     inBatch++; if(inBatch>=BATCH_LIMIT){ ctx.fill(); ctx.beginPath(); inBatch=0; }
+    }
+    if(inBatch>0)ctx.fill();
+   }
+  }
+
+  function renderAdvanced(){
+   const np=nodePositions, cn=cellNodes, ag=activeGrid, lc=lockedCells;
+   countsEvolve.fill(0); countsLocked.fill(0);
+   for(let i=0;i<totalCells;i++){
+    const c=ag[i], nB=i*3;
+    const n0=cn[nB]<<1, n1=cn[nB+1]<<1, n2=cn[nB+2]<<1;
+    const x0=(np[n0]+0.5)|0, y0=(np[n0|1]+0.5)|0;
+    const x1=(np[n1]+0.5)|0, y1=(np[n1|1]+0.5)|0;
+    const x2=(np[n2]+0.5)|0, y2=(np[n2|1]+0.5)|0;
+    if(lc[i]){
+     const ptr=countsLocked[c], buf=bufsLocked[c];
+     buf[ptr]=x0; buf[ptr+1]=y0; buf[ptr+2]=x1; buf[ptr+3]=y1; buf[ptr+4]=x2; buf[ptr+5]=y2;
+     countsLocked[c]=ptr+6;
+    } else {
+     const ptr=countsEvolve[c], buf=bufsEvolve[c];
+     buf[ptr]=x0; buf[ptr+1]=y0; buf[ptr+2]=x1; buf[ptr+3]=y1; buf[ptr+4]=x2; buf[ptr+5]=y2;
+     countsEvolve[c]=ptr+6;
+    }
+   }
+   ctx.fillStyle=bgColor; ctx.fillRect(0,0,w,ht);
+   if(evolveAlpha>0){
+    ctx.globalAlpha=evolveAlpha;
+    for(let c=0;c<NUM_COLORS;c++){
+     const cnt=countsEvolve[c]; if(!cnt)continue; const buf=bufsEvolve[c];
+     ctx.fillStyle=PALETTE[c]; ctx.beginPath(); let inBatch=0;
+     for(let i=0;i<cnt;i+=6){
+      ctx.moveTo(buf[i],buf[i+1]); ctx.lineTo(buf[i+2],buf[i+3]); ctx.lineTo(buf[i+4],buf[i+5]);
+      inBatch++; if(inBatch>=BATCH_LIMIT){ ctx.fill(); ctx.beginPath(); inBatch=0; }
+     }
+     if(inBatch>0)ctx.fill();
+    }
+   }
+   if(lockAlpha>0){
+    ctx.globalAlpha=lockAlpha;
+    for(let c=0;c<NUM_COLORS;c++){
+     const cnt=countsLocked[c]; if(!cnt)continue; const buf=bufsLocked[c];
+     ctx.fillStyle=PALETTE[c]; ctx.beginPath(); let inBatch=0;
+     for(let i=0;i<cnt;i+=6){
+      ctx.moveTo(buf[i],buf[i+1]); ctx.lineTo(buf[i+2],buf[i+3]); ctx.lineTo(buf[i+4],buf[i+5]);
+      inBatch++; if(inBatch>=BATCH_LIMIT){ ctx.fill(); ctx.beginPath(); inBatch=0; }
+     }
+     if(inBatch>0)ctx.fill();
+    }
+   }
+   ctx.globalAlpha=1;
+  }
+
+  function render(){
+   if(advancedMode) renderAdvanced(); else renderSimple();
+  }
+
+  function findTriangle(x,y){
+   if(!cellNodes)return -1;
+   const sr=Math.ceil(jitterScale)+1;
+   const gx=(x-cx)*COS45+(y-cy)*COS45, gy=-(x-cx)*COS45+(y-cy)*COS45;
+   const tr=((gx/TILE)|0)+radius, tyr=((gy/TILE)|0)+radius;
+   const tx0=Math.max(0,tr-sr), ty0=Math.max(0,tyr-sr), tx1=Math.min(gridW-1,tr+sr), ty1=Math.min(gridH-1,tyr+sr);
+   for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++){
+    const base=(ty*gridW+tx)*8;
+    for(let tri=0;tri<8;tri++){
+     const i=base+tri, nB=i*3;
+     const n0=cellNodes[nB]<<1, n1=cellNodes[nB+1]<<1, n2=cellNodes[nB+2]<<1;
+     const x1=nodePositions[n0], y1=nodePositions[n0|1];
+     const x2=nodePositions[n1], y2=nodePositions[n1|1];
+     const x3=nodePositions[n2], y3=nodePositions[n2|1];
+     const d1=(x-x2)*(y1-y2)-(x1-x2)*(y-y2), d2=(x-x3)*(y2-y3)-(x2-x3)*(y-y3), d3=(x-x1)*(y3-y1)-(x3-x1)*(y-y1);
+     if(!((d1<0||d2<0||d3<0)&&(d1>0||d2>0||d3>0)))return i;
+    }
+   }
+   return -1;
+  }
+
+  function findTrianglesInRadius(x,y,r){
+   const triangles=[];
+   const step=TILE*0.4;
+   for(let ox=-r;ox<=r;ox+=step){
+    for(let oy=-r;oy<=r;oy+=step){
+     if(ox*ox+oy*oy<=r*r){
+      const i=findTriangle(x+ox,y+oy);
+      if(i!==-1&&!triangles.includes(i)) triangles.push(i);
+     }
+    }
+   }
+   return triangles;
+  }
+
+  function getSymmetricPoints(x,y){
+   const points=[[x,y]];
+   if(symmetryMode>=1) points.push([2*cx-x,y]);
+   if(symmetryMode>=2){ points.push([x,2*cy-y]); points.push([2*cx-x,2*cy-y]); }
+   if(symmetryMode>=3){
+    const dx=x-cx, dy=y-cy;
+    points.push([cx+dy,cy+dx],[cx-dy,cy-dx],[cx+dy,cy-dx],[cx-dy,cy+dx]);
+   }
+   return points;
+  }
+
+  function drawAt(x,y){
+   const points=getSymmetricPoints(x,y);
+   const r=(brushSize-1)*TILE*0.5;
+   for(const[px,py] of points){
+    const triangles=r>0?findTrianglesInRadius(px,py,r):[findTriangle(px,py)];
+    for(const i of triangles){
+     if(i===-1)continue;
+     const nB=i*3;
+     if(isWaking){
+      wokenCells[i]=1;
+      activeNodes[cellNodes[nB]]=activeNodes[cellNodes[nB+1]]=activeNodes[cellNodes[nB+2]]=1;
+      if(lockedCells[i]) lockedCells[i]=0;
+     } else if(isRandomPaint){
+      activeGrid[i]=(Math.random()*NUM_COLORS)|0;
+      lockedCells[i]=1;
+     } else if(isErasing){
+      if(lockedCells[i]){
+       lockedCells[i]=0; wokenCells[i]=1;
+       activeNodes[cellNodes[nB]]=activeNodes[cellNodes[nB+1]]=activeNodes[cellNodes[nB+2]]=1;
+      }
+     } else {
+      activeGrid[i]=drawColor; lockedCells[i]=1;
+     }
+    }
+   }
+  }
+
+  function drawOverlayStroke(x1,y1,x2,y2){
+   brushCtx.globalAlpha=overlayBrushOpacity;
+   brushCtx.strokeStyle=overlayBrushColor;
+   brushCtx.lineWidth=overlayBrushSize;
+   brushCtx.lineCap='round';
+   brushCtx.lineJoin='round';
+   brushCtx.beginPath();
+   brushCtx.moveTo(x1,y1);
+   brushCtx.lineTo(x2,y2);
+   brushCtx.stroke();
+   brushCtx.globalAlpha=1;
+  }
+
+  function clearOverlayBrush(){
+   brushCtx.clearRect(0,0,w,ht);
+   saveBrushHistory();
+  }
+
+  function startDraw(x,y,rightClick=false){
+   if(overlayBrushMode){
+    isOverlayDrawing=true;
+    overlayLastX=x;
+    overlayLastY=y;
+    drawOverlayStroke(x,y,x,y);
+    return;
+   }
+   
+   const i=findTriangle(x,y); if(i===-1)return;
+   isDrawing=true; isWaking=false; isErasing=false; isRandomPaint=false;
+   lastX=x; lastY=y;
+   
+   if(stillMode){
+    if(rightClick){
+     isWaking=true;
+     showMode('🌌');
+    } else if(selectedPaletteColor===TOOL_WAKE||selectedPaletteColor===-1){
+     isWaking=true;
+     showMode('🌌');
+    } else if(selectedPaletteColor===TOOL_RANDOM){
+     isRandomPaint=true;
+     showMode('🎰');
+    } else if(selectedPaletteColor>=0){
+     drawColor=selectedPaletteColor;
+     showModeColor(PALETTE[drawColor]);
+    }
+    drawAt(x,y);
+   } else if(rightClick||lockedCells[i]||selectedPaletteColor===TOOL_WAKE){
+    isErasing=true;
+    wokenCells.fill(0); activeNodes.fill(0);
+    showMode('🌌');
+    drawAt(x,y); paused=false;
+   } else if(selectedPaletteColor===TOOL_RANDOM){
+    isRandomPaint=true;
+    showMode('🎰');
+    paused=true;
+    drawAt(x,y); render();
+   } else {
+    drawColor=selectedPaletteColor>=0?selectedPaletteColor:activeGrid[i];
+    lockedCells[i]=1;
+    showModeColor(PALETTE[drawColor]);
+    paused=true; render();
+   }
+  }
+
+  function continueDraw(x,y){
+   if(isOverlayDrawing){
+    drawOverlayStroke(overlayLastX,overlayLastY,x,y);
+    overlayLastX=x;
+    overlayLastY=y;
+    return;
+   }
+   
+   if(!isDrawing)return;
+   const dx=x-lastX, dy=y-lastY, dist=Math.sqrt(dx*dx+dy*dy), steps=Math.max(1,Math.ceil(dist/(TILE*0.3)));
+   for(let i=0;i<=steps;i++){ const t=i/steps; drawAt(lastX+dx*t,lastY+dy*t); }
+   lastX=x; lastY=y; if(paused||stillMode)render();
+  }
+
+  function stopDraw(){
+   if(isOverlayDrawing){
+    isOverlayDrawing=false;
+    saveBrushHistory();
+    return;
+   }
+   
+   if(isDrawing){
+    saveHistory();
+    isDrawing=isErasing=isWaking=isRandomPaint=false;
+    if(!stillMode){
+     paused=false;
+     hideMode();
+     requestAnimationFrame(loop);
+    } else {
+     hideMode();
+    }
+   }
+  }
+
+  function showMode(text){
+   const indicator=document.getElementById('modeIndicator');
+   indicator.innerHTML=text;
+   indicator.classList.add('visible');
+  }
+
+  function showModeColor(color){
+   const indicator=document.getElementById('modeIndicator');
+   const darkenedColor=darkenHex(color);
+   indicator.innerHTML=`<div class="color-swatch" style="background:${darkenedColor}"></div>`;
+   indicator.classList.add('visible');
+  }
+
+  function hideMode(){
+   document.getElementById('modeIndicator').classList.remove('visible');
+  }
+
+  function setStillMode(enabled){
+   stillMode=enabled;
+   el('toggleStill').classList.toggle('active',stillMode);
+   if(stillMode){
+    wokenCells.fill(0);
+    activeNodes.fill(0);
+    paused=false;
+   } else {
+    hideMode();
+    paused=false;
+   }
+   requestAnimationFrame(loop);
+  }
+
+  function toggleAdvancedMode(){
+   advancedMode=!advancedMode;
+   el('settingsToggle').classList.toggle('active',advancedMode);
+   el('advancedPanel').classList.toggle('visible',advancedMode);
+   if(!advancedMode){
+    TILE=DEFAULT_TILE;
+    evolveAlpha=1;
+    lockAlpha=1;
+    el('tileSizeInput').value=DEFAULT_TILE;
+    el('evolveAlpha').value=100;
+    el('lockAlpha').value=100;
+    initGrid(true);
+   }
+   if(!stillMode) requestAnimationFrame(loop); else render();
+  }
+
+  function toggleOverlayBrush(){
+   overlayBrushMode=!overlayBrushMode;
+   el('brushToggle').classList.toggle('active',overlayBrushMode);
+   el('brushPanel').classList.toggle('visible',overlayBrushMode);
+   if(overlayBrushMode){
+    brushCanvas.style.display='block';
+    if(savedBrushData){
+     brushCtx.putImageData(savedBrushData,0,0);
+    }
+   } else {
+    savedBrushData=brushCtx.getImageData(0,0,w,ht);
+    brushCanvas.style.display='none';
+   }
+  }
+
+  function toggleChipaway(){
+   chipawayMode=!chipawayMode;
+   el('chipawayToggle').classList.toggle('active',chipawayMode);
+   el('chipawayPanel').classList.toggle('visible',chipawayMode);
+  }
+
+  function exportState(){
+   const state={
+    version:1,
+    w,ht,TILE,
+    grid:Array.from(activeGrid),
+    locked:Array.from(lockedCells),
+    woken:Array.from(wokenCells),
+    settings:{
+     mutationRate,driftSpeed,colorInterval,jitterScale,
+     stillMode,advancedMode,evolveAlpha,lockAlpha,bgColor,
+     darkness:parseFloat(dimOverlay.style.opacity)||0.5,
+     symmetryMode,brushSize,selectedPaletteColor,
+     chipawayMode,chipawayRate
+    },
+    overlayBrush:{
+     size:overlayBrushSize,
+     color:overlayBrushColor,
+     opacity:overlayBrushOpacity,
+     canvas:brushCanvas.toDataURL()
+    }
+   };
+   const blob=new Blob([JSON.stringify(state)],{type:'application/json'});
+   const link=document.createElement('a');
+   link.download=`shimmer-state-${Date.now()}.json`;
+   link.href=URL.createObjectURL(blob);
+   link.click();
+   URL.revokeObjectURL(link.href);
+  }
+
+  function importState(file){
+   const reader=new FileReader();
+   reader.onload=e=>{
+    try{
+     const state=JSON.parse(e.target.result);
+     if(!state.version)throw new Error('Invalid file');
+     
+     TILE=state.TILE||DEFAULT_TILE;
+     el('tileSizeInput').value=TILE;
+     
+     const s=state.settings;
+     mutationRate=s.mutationRate; el('mutationSlider').value=mutationRate*100; updateVal('vMut',Math.round(mutationRate*100),'%');
+     driftSpeed=s.driftSpeed; el('driftSlider').value=driftSpeed*100; updateVal('vDrift',Math.round(driftSpeed*100),'%');
+     colorInterval=s.colorInterval; el('colorRateSlider').value=(1020-colorInterval)/10; updateVal('vColor',Math.round((1020-colorInterval)/10));
+     jitterScale=s.jitterScale; el('distortSlider').value=jitterScale*100; updateVal('vDist',Math.round(jitterScale*100),'%');
+     dimOverlay.style.opacity=s.darkness; el('dimSlider').value=s.darkness*100; updateVal('vDim',Math.round(s.darkness*100),'%');
+     symmetryMode=s.symmetryMode; el('btnSymmetry').textContent='Sym: '+['Off','H','4','8'][symmetryMode]; el('btnSymmetry').classList.toggle('active',symmetryMode>0);
+     brushSize=s.brushSize; el('brushSlider').value=brushSize; updateVal('vBrush',brushSize);
+     selectedPaletteColor=s.selectedPaletteColor;
+     
+     if(s.chipawayMode!==undefined){
+      chipawayMode=s.chipawayMode;
+      chipawayRate=s.chipawayRate||0.003;
+      el('chipawayToggle').classList.toggle('active',chipawayMode);
+      el('chipawayPanel').classList.toggle('visible',chipawayMode);
+      el('chipawayRate').value=(chipawayRate*100).toFixed(2);
+     }
+     
+     advancedMode=s.advancedMode;
+     el('settingsToggle').classList.toggle('active',advancedMode);
+     el('advancedPanel').classList.toggle('visible',advancedMode);
+     evolveAlpha=s.evolveAlpha; el('evolveAlpha').value=Math.round(evolveAlpha*100);
+     lockAlpha=s.lockAlpha; el('lockAlpha').value=Math.round(lockAlpha*100);
+     bgColor=s.bgColor; el('bgColorPicker').value=bgColor; el('bgColorBtn').style.background=bgColor;
+     
+     initGrid(false);
+     
+     if(state.grid.length===totalCells){
+      activeGrid.set(state.grid);
+      lockedCells.set(state.locked);
+      if(state.woken)wokenCells.set(state.woken);
+     }
+     
+     if(state.overlayBrush){
+      overlayBrushSize=state.overlayBrush.size; el('overlayBrushSize').value=overlayBrushSize;
+      overlayBrushColor=state.overlayBrush.color; el('overlayBrushColor').value=overlayBrushColor; el('overlayBrushColorBtn').style.background=overlayBrushColor;
+      overlayBrushOpacity=state.overlayBrush.opacity; el('overlayBrushOpacity').value=Math.round(overlayBrushOpacity*100);
+      const img=new Image();
+      img.onload=()=>{
+       brushCtx.clearRect(0,0,w,ht);
+       brushCtx.drawImage(img,0,0);
+       savedBrushData=brushCtx.getImageData(0,0,w,ht);
+       brushHistory=[]; brushHistoryIndex=-1; saveBrushHistory();
+      };
+      img.src=state.overlayBrush.canvas;
+     }
+     
+     stillMode=s.stillMode;
+     el('toggleStill').classList.toggle('active',stillMode);
+     
+     history=[]; historyIndex=-1; saveHistory();
+     if(!stillMode) requestAnimationFrame(loop); else render();
+    }catch(err){
+     alert('Failed to load state: '+err.message);
+    }
+   };
+   reader.readAsText(file);
+  }
+
+  function saveImage(){
+   const tempCanvas=document.createElement('canvas');
+   tempCanvas.width=w; tempCanvas.height=ht;
+   const tempCtx=tempCanvas.getContext('2d');
+   tempCtx.drawImage(canvas,0,0);
+   const darkness=parseFloat(dimOverlay.style.opacity)||0.5;
+   if(darkness>0){
+    tempCtx.fillStyle=`rgba(0,0,0,${darkness})`;
+    tempCtx.fillRect(0,0,w,ht);
+   }
+   if(overlayBrushMode||savedBrushData){
+    tempCtx.drawImage(brushCanvas,0,0);
+   }
+   const link=document.createElement('a');
+   link.download=`shimmer-${Date.now()}.png`;
+   link.href=tempCanvas.toDataURL('image/png');
+   link.click();
+  }
+
+  function randomizeColors(){
+   for(let i=0;i<totalCells;i++){
+    if(!lockedCells[i]) activeGrid[i]=(Math.random()*NUM_COLORS)|0;
+   }
+   saveHistory();
+  }
+
+  function loop(t){
+   if(paused)return;
+   requestAnimationFrame(loop);
+   updateFps(t);
+   driftNodes();
+   if(t-lastColorTime>colorInterval){ stepColors(); lastColorTime=t; }
+   render();
+  }
+
+  const el=id=>document.getElementById(id);
+  const updateVal=(id,v,s='')=>el(id).textContent=v+s;
+
+  function setupDraggableInputs(){
+   document.querySelectorAll('.mini-input').forEach(input=>{
+    input.addEventListener('mousedown',startInputDrag);
+    input.addEventListener('touchstart',startInputDrag,{passive:false});
+   });
+  }
+
+  function startInputDrag(e){
+   if(e.target.tagName!=='INPUT')return;
+   const input=e.target;
+   const isTouch=e.type==='touchstart';
+   const clientY=isTouch?e.touches[0].clientY:e.clientY;
+   
+   dragInput=input;
+   dragStartY=clientY;
+   dragStartValue=parseFloat(input.value)||0;
+   input.classList.add('dragging');
+   
+   e.preventDefault();
+   
+   if(isTouch){
+    document.addEventListener('touchmove',onInputDrag,{passive:false});
+    document.addEventListener('touchend',endInputDrag);
+    document.addEventListener('touchcancel',endInputDrag);
+   } else {
+    document.addEventListener('mousemove',onInputDrag);
+    document.addEventListener('mouseup',endInputDrag);
+   }
+  }
+
+  function onInputDrag(e){
+   if(!dragInput)return;
+   e.preventDefault();
+   
+   const isTouch=e.type==='touchmove';
+   const clientY=isTouch?e.touches[0].clientY:e.clientY;
+   const deltaY=dragStartY-clientY;
+   
+   const min=parseFloat(dragInput.dataset.min)||0;
+   const max=parseFloat(dragInput.dataset.max)||100;
+   const step=parseFloat(dragInput.dataset.step)||1;
+   const decimals=parseInt(dragInput.dataset.decimals)||0;
+   
+   const sensitivity=step*0.5;
+   let newValue=dragStartValue+deltaY*sensitivity;
+   newValue=Math.max(min,Math.min(max,newValue));
+   newValue=Math.round(newValue/step)*step;
+   
+   if(decimals>0){
+    dragInput.value=newValue.toFixed(decimals);
+   } else {
+    dragInput.value=Math.round(newValue);
+   }
+   
+   const evt=new Event('input',{bubbles:true});
+   dragInput.dispatchEvent(evt);
+  }
+
+  function endInputDrag(e){
+   if(!dragInput)return;
+   dragInput.classList.remove('dragging');
+   
+   const evt=new Event('change',{bubbles:true});
+   dragInput.dispatchEvent(evt);
+   
+   dragInput=null;
+   
+   document.removeEventListener('mousemove',onInputDrag);
+   document.removeEventListener('mouseup',endInputDrag);
+   document.removeEventListener('touchmove',onInputDrag);
+   document.removeEventListener('touchend',endInputDrag);
+   document.removeEventListener('touchcancel',endInputDrag);
+  }
+
+  const paletteRow=el('palette');
+  PALETTE.forEach((color,i)=>{
+   const swatch=document.createElement('div');
+   swatch.className='palette-swatch';
+   swatch.style.background=color;
+   swatch.title=color;
+   swatch.onclick=()=>{
+    document.querySelectorAll('.palette-swatch').forEach(s=>s.classList.remove('active'));
+    if(selectedPaletteColor===i){ selectedPaletteColor=-1; }
+    else{ selectedPaletteColor=i; swatch.classList.add('active'); }
+   };
+   paletteRow.appendChild(swatch);
+  });
+
+  el('toolWake').onclick=()=>{
+   document.querySelectorAll('.palette-swatch').forEach(s=>s.classList.remove('active'));
+   if(selectedPaletteColor===TOOL_WAKE){ selectedPaletteColor=-1; }
+   else{ selectedPaletteColor=TOOL_WAKE; el('toolWake').classList.add('active'); }
+  };
+
+  el('toolRandom').onclick=()=>{
+   document.querySelectorAll('.palette-swatch').forEach(s=>s.classList.remove('active'));
+   if(selectedPaletteColor===TOOL_RANDOM){ selectedPaletteColor=-1; }
+   else{ selectedPaletteColor=TOOL_RANDOM; el('toolRandom').classList.add('active'); }
+  };
+
+  el('settingsToggle').onclick=toggleAdvancedMode;
+  el('brushToggle').onclick=toggleOverlayBrush;
+  el('chipawayToggle').onclick=toggleChipaway;
+
+  el('tileSizeInput').oninput=function(){
+   if(!advancedMode)return;
+   TILE=parseInt(this.value)||DEFAULT_TILE;
+  };
+  el('tileSizeInput').onchange=function(){
+   if(!advancedMode)return;
+   const v=parseInt(this.value)||DEFAULT_TILE;
+   TILE=Math.max(8,Math.min(100,v));
+   this.value=TILE;
+   initGrid(true);
+   if(!stillMode) requestAnimationFrame(loop); else render();
+  };
+
+  el('evolveAlpha').oninput=function(){
+   if(!advancedMode)return;
+   const v=parseInt(this.value);
+   evolveAlpha=Math.max(0,Math.min(100,isNaN(v)?100:v))/100;
+  };
+  el('evolveAlpha').onchange=function(){
+   if(!advancedMode)return;
+   const v=parseInt(this.value);
+   evolveAlpha=Math.max(0,Math.min(100,isNaN(v)?100:v))/100;
+   this.value=Math.round(evolveAlpha*100);
+   if(stillMode||paused) render();
+  };
+
+  el('lockAlpha').oninput=function(){
+   if(!advancedMode)return;
+   const v=parseInt(this.value);
+   lockAlpha=Math.max(0,Math.min(100,isNaN(v)?100:v))/100;
+  };
+  el('lockAlpha').onchange=function(){
+   if(!advancedMode)return;
+   const v=parseInt(this.value);
+   lockAlpha=Math.max(0,Math.min(100,isNaN(v)?100:v))/100;
+   this.value=Math.round(lockAlpha*100);
+   if(stillMode||paused) render();
+  };
+
+  el('bgColorPicker').oninput=function(){
+   if(!advancedMode)return;
+   bgColor=this.value;
+   el('bgColorBtn').style.background=bgColor;
+   if(stillMode||paused) render();
+  };
+
+  el('bgColorBtn').onclick=()=>{if(advancedMode)el('bgColorPicker').click();};
+
+  el('exportBtn').onclick=exportState;
+  el('importBtn').onclick=()=>el('fileInput').click();
+  el('fileInput').onchange=function(){if(this.files[0])importState(this.files[0]);this.value='';};
+
+  el('overlayBrushSize').oninput=function(){
+   if(!overlayBrushMode)return;
+   const v=parseInt(this.value);
+   overlayBrushSize=Math.max(1,Math.min(100,isNaN(v)?2:v));
+  };
+  el('overlayBrushSize').onchange=function(){
+   if(!overlayBrushMode)return;
+   const v=parseInt(this.value);
+   overlayBrushSize=Math.max(1,Math.min(100,isNaN(v)?2:v));
+   this.value=overlayBrushSize;
+  };
+
+  el('overlayBrushColor').oninput=function(){
+   if(!overlayBrushMode)return;
+   overlayBrushColor=this.value;
+   el('overlayBrushColorBtn').style.background=overlayBrushColor;
+  };
+
+  el('overlayBrushColorBtn').onclick=()=>{if(overlayBrushMode)el('overlayBrushColor').click();};
+
+  el('overlayBrushOpacity').oninput=function(){
+   if(!overlayBrushMode)return;
+   const v=parseInt(this.value);
+   overlayBrushOpacity=Math.max(0,Math.min(100,isNaN(v)?100:v))/100;
+  };
+  el('overlayBrushOpacity').onchange=function(){
+   if(!overlayBrushMode)return;
+   const v=parseInt(this.value);
+   overlayBrushOpacity=Math.max(0,Math.min(100,isNaN(v)?100:v))/100;
+   this.value=Math.round(overlayBrushOpacity*100);
+  };
+
+  el('chipawayRate').oninput=function(){
+   if(!chipawayMode)return;
+   const v=parseFloat(this.value);
+   chipawayRate=Math.max(0.01,Math.min(10,isNaN(v)?0.3:v))/100;
+  };
+  el('chipawayRate').onchange=function(){
+   if(!chipawayMode)return;
+   const v=parseFloat(this.value);
+   chipawayRate=Math.max(0.01,Math.min(10,isNaN(v)?0.3:v))/100;
+   this.value=(chipawayRate*100).toFixed(2);
+  };
+
+  el('brushUndoBtn').onclick=undoBrush;
+  el('brushRedoBtn').onclick=redoBrush;
+  el('clearBrushBtn').onclick=clearOverlayBrush;
+
+  el('mutationSlider').oninput=function(){ mutationRate=this.value/100; updateVal('vMut',this.value,'%'); };
+  el('dimSlider').oninput=function(){ dimOverlay.style.opacity=this.value/100; updateVal('vDim',this.value,'%'); };
+  el('driftSlider').oninput=function(){ driftSpeed=this.value/100; updateVal('vDrift',this.value,'%'); };
+  el('colorRateSlider').oninput=function(){ colorInterval=1020-this.value*10; updateVal('vColor',this.value); };
+  el('distortSlider').oninput=function(){ jitterScale=this.value/100; updateVal('vDist',this.value,'%'); };
+  el('brushSlider').oninput=function(){ brushSize=+this.value; updateVal('vBrush',this.value); };
+
+  el('btnReset').onclick=()=>{ initGrid(false); if(!stillMode) requestAnimationFrame(loop); else render(); };
+  el('btnRandomize').onclick=()=>{ randomizeColors(); if(stillMode) render(); };
+  el('btnSave').onclick=saveImage;
+  el('btnSymmetry').onclick=function(){
+   symmetryMode=(symmetryMode+1)%4;
+   const labels=['Off','H','4','8'];
+   this.textContent='Sym: '+labels[symmetryMode];
+   this.classList.toggle('active',symmetryMode>0);
+  };
+  
+  el('toggleStill').onclick=function(){ setStillMode(!stillMode); };
+
+  canvas.oncontextmenu=e=>e.preventDefault();
+  onmousedown=e=>{
+   if(e.target.closest('.controls'))return;
+   if(dragInput)return;
+   e.preventDefault();
+   startDraw(e.clientX,e.clientY,e.button===2);
+  };
+  onmousemove=e=>{
+   if(dragInput)return;
+   continueDraw(e.clientX,e.clientY);
+  };
+  onmouseup=e=>{
+   if(dragInput)return;
+   stopDraw();
+  };
+  onmouseleave=e=>{
+   if(dragInput)return;
+   stopDraw();
+  };
+
+  onkeydown=e=>{
+   if(e.target.tagName==='INPUT')return;
+   switch(e.code){
+    case 'Space': 
+     if(!isDrawing){ 
+      e.preventDefault(); 
+      if(stillMode){
+       setStillMode(false);
+      } else {
+       paused=true; showMode('⏸'); 
+      }
+     } 
+     break;
+    case 'KeyS': if(e.ctrlKey||e.metaKey){ e.preventDefault(); saveImage(); } else if(!e.ctrlKey){ setStillMode(!stillMode); } break;
+    case 'KeyR': if(!e.ctrlKey){ initGrid(false); if(!stillMode) requestAnimationFrame(loop); else render(); } break;
+    case 'KeyZ': if(e.ctrlKey||e.metaKey){ e.preventDefault(); if(e.shiftKey)redo();else undo(); } break;
+    case 'KeyY': if(e.ctrlKey||e.metaKey){ e.preventDefault(); redo(); } break;
+    case 'BracketLeft': brushSize=Math.max(1,brushSize-1); el('brushSlider').value=brushSize; updateVal('vBrush',brushSize); break;
+    case 'BracketRight': brushSize=Math.min(10,brushSize+1); el('brushSlider').value=brushSize; updateVal('vBrush',brushSize); break;
+    case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': case 'Digit5':
+    case 'Digit6': case 'Digit7': case 'Digit8': case 'Digit9':
+     const idx=+e.code.slice(-1)-1;
+     if(idx<NUM_COLORS){
+      selectedPaletteColor=idx;
+      document.querySelectorAll('.palette-swatch').forEach((s,i)=>s.classList.toggle('active',i===idx));
+     }
+     break;
+    case 'Digit0': case 'Escape':
+     selectedPaletteColor=-1;
+     document.querySelectorAll('.palette-swatch').forEach(s=>s.classList.remove('active'));
+     break;
+   }
+  };
+
+  onkeyup=e=>{
+   if(e.code==='Space'&&!isDrawing&&paused&&!stillMode){
+    e.preventDefault(); paused=false; hideMode(); requestAnimationFrame(loop);
+   }
+  };
+
+  onresize=()=>{ clearTimeout(resizeTimeout); resizeTimeout=setTimeout(()=>{ 
+   const oldBrushData=brushCtx.getImageData(0,0,w,ht);
+   initGrid(false); 
+   brushCtx.putImageData(oldBrushData,0,0);
+   savedBrushData=brushCtx.getImageData(0,0,w,ht);
+   if(!stillMode) requestAnimationFrame(loop); else render(); 
+  },150); };
+
+  window.addEventListener('touchstart',e=>{
+   if(e.target.closest('.controls'))return;
+   if(e.target.classList.contains('mini-input'))return;
+   e.preventDefault();
+   startDraw(e.touches[0].clientX,e.touches[0].clientY);
+  },{passive:false});
+
+  window.addEventListener('touchmove',e=>{
+   if(dragInput)return;
+   if(!isDrawing&&!isOverlayDrawing)return;
+   e.preventDefault();
+   continueDraw(e.touches[0].clientX,e.touches[0].clientY);
+  },{passive:false});
+
+  window.addEventListener('touchend',e=>{
+   if(dragInput)return;
+   stopDraw();
+  });
+  window.addEventListener('touchcancel',e=>{
+   if(dragInput)return;
+   stopDraw();
+  });
+
+  setupDraggableInputs();
+  initGrid(false);
+  requestAnimationFrame(loop);
+ })();
+ </script>
+</body>
+</html>
