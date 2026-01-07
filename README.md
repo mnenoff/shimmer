@@ -11,3 +11,10 @@ I cannot forbear to mention among these precepts a new device for study which, a
 https://en.wikipedia.org/wiki/Pareidolia
 
 https://en.wikisource.org/wiki/The_Notebooks_of_Leonardo_Da_Vinci/IX
+
+
+63. Modo d’aumentare e destare l’ingegno a varie invenzioni.
+
+Non resterò di mettere fra questi precetti una nuova invenzione di speculazione, la quale, benchè paia piccola e quasi degna di riso, nondimeno è di grande utilità a destare l’ingegno a varie invenzioni. E questa è se tu riguarderai in alcuni muri imbrattati di varie macchie o in pietre di varî misti. Se avrai a invenzionare qualche sito, potrai lì vedere similitudini di diversi paesi, ornati di montagne, fiumi, sassi, alberi, pianure grandi, valli e colli in diversi modi; ancora vi potrai vedere diverse battaglie ed atti pronti di figure strane, arie di volti ed abiti ed infinite cose, le quali tu potrai ridurre in integra e buona forma; che interviene in simili muri e misti, come del suono delle campane, che ne’ loro tocchi vi troverai ogni nome e vocabolo che tu t’immaginerai. 
+
+https://it.wikisource.org/wiki/Pagina:Leonardo_-_Trattato_della_pittura,_1890.djvu/114
